@@ -12,17 +12,20 @@ library(dplyr)
 library(stringr)
 library(forcats)
 
-setwd("~/Desktop/Behavioural Data Science/BDA/R Scripts")
 
-list.files(path = "~/Desktop/Behavioural Data Science/BDA/R Scripts")
+# Getting the data --------------------------------------------------------
+
+setwd("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality")
+
+list.files(path = "~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality")
 
 # source transcript text files
-transcript_files = dir("~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1/youtube-personality/transcripts", full.names = TRUE) 
+transcript_files = dir("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/transcripts", full.names = TRUE) 
 head(transcript_files)
 
 # encodevlogger ID 
 vlogId = basename(transcript_files)
-vlogId = str_replace(vlogId, pattern = ".txt$", replacement = "")
+vlogId = str_replace(vlogId, pattern = ".txt$", replacement = "") ### Error
 head(vlogId)
 
 # store text files in a dataframe
@@ -30,30 +33,47 @@ transcripts_df = tibble(vlogId = vlogId, Text = map_chr(transcript_files, ~ past
 transcripts_df %>% head()
 
 # read  dataset
-pers = read_delim("~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1/youtube-personality/YouTube-Personality-Personality_impression_scores_train.csv", " ")
+pers = read_delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-Personality_impression_scores_train.csv", " ")
 head(pers)
 
-gender = read.delim("~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1/youtube-personality/YouTube-Personality-gender.csv", head=FALSE, sep=" ", skip = 2)
+gender = read.delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-gender.csv", sep=" ")
 names(gender) = c('vlogId', 'gender')
 head(gender)
 
-audiovisual = read.delim("~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1/youtube-personality/YouTube-Personality-audiovisual_features.csv", header = T,sep=" ")
+audiovisual = read.delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-audiovisual_features.csv", sep=" ")
 names(audiovisual) 
 head(audiovisual)
 
-vlogger_df = left_join(gender, pers)
-vlogger_df = left_join(audiovisual, pers, by = "vlogId")
+vlogger = left_join(gender, pers)
+vlogger_df = left_join(vlogger, audiovisual, by = "vlogId")
 head(vlogger_df) 
 
 # Test set: vlogs that has missing personality scores should be predicted 
 testset_vloggers = vlogger_df %>% 
   filter(is.na(Extr))
 head(testset_vloggers)
+as.tibble()
 
+# Parsing the vlogs -------------------------------------------------------
 
+# every word as one token per row, instead of lines
+transcripts_df2 = transcripts_df %>% 
+  unnest_tokens(Word, Text) # capital T,
+
+test_transcripts_data = semi_join(transcripts_df2,testset_vloggers, by="vlogId") ## Keeps the NAs
+test_transcripts_data
+
+train_transcripts_data = anti_join(transcripts_df2,testset_vloggers, by="vlogId") ## Removes the NAs
+train_transcripts_data
+ 
+
+##### Calculate the most used words (90%) for every individual vlog, and 
+
+###### Create a new var which has the proportion of stop words used, and then remove the stop words to continue with the analysis
 
 
 # Work in progress: Parsing and prediction --------------------------------
+
 
 
 
@@ -84,11 +104,7 @@ names(vlogger_df)
 #################### Cera
 
 library(tidytext)
-# every word as one token per row, instead of lines
-transcripts_df %>% 
-  unnest_tokens(Word, Text) # capital T, 
 
-transcripts_testvlog <- semi_join(transcripts_df,testset_vloggers, by="vlogId")
 
 
 
