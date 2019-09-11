@@ -2,3 +2,13 @@ library(tidyverse)
 x <- "hello"
 y <- "hi"
 t = "Hello"
+
+
+list.files(path = "../input")
+
+install.packages("httr") 
+
+
+and "jsonlite
+
+https://www.kaggle.com/t/47d624491de743419f5412367e574e2a
