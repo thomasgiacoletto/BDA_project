@@ -12,7 +12,7 @@ library(dplyr)
 library(stringr)
 library(forcats)
 
-
+HELLO
 # Getting the data --------------------------------------------------------
 
 setwd("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality")
