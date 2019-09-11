@@ -1,21 +1,6 @@
 # Competition1: Personality Profiling
 # attach packages
 library(tidyverse)
-<<<<<<< HEAD
-x <- "hello"
-y <- "hi"
-t = "Hello"
-
-
-list.files(path = "../input")
-
-install.packages("httr") 
-
-
-and "jsonlite
-
-https://www.kaggle.com/t/47d624491de743419f5412367e574e2a
-=======
 library(tidytext)
 library(textdata)
 library(ggplot2)
@@ -27,7 +12,9 @@ library(dplyr)
 library(stringr)
 library(forcats)
 
-list.files(path = "~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1")
+setwd("~/Desktop/Behavioural Data Science/BDA/R Scripts")
+
+list.files(path = "~/Desktop/Behavioural Data Science/BDA/R Scripts")
 
 # source transcript text files
 transcript_files = dir("~/Library/Mobile Documents/com~apple~CloudDocs/UvA/Big Data Analytics/ M2. Multiple Regression/Competition1/youtube-personality/transcripts", full.names = TRUE) 
@@ -64,6 +51,12 @@ testset_vloggers = vlogger_df %>%
 head(testset_vloggers)
 
 
+
+
+# Work in progress: Parsing and prediction --------------------------------
+
+
+
 ### Predictions
 
 ## 1. transcripts - sentiment analysis
@@ -88,6 +81,15 @@ names(vlogger_df)
 
 
 
+#################### Cera
+
+library(tidytext)
+# every word as one token per row, instead of lines
+transcripts_df %>% 
+  unnest_tokens(Word, Text) # capital T, 
+
+transcripts_testvlog <- semi_join(transcripts_df,testset_vloggers, by="vlogId")
+
 
 
 
@@ -107,7 +109,7 @@ head(testset_pred)
 
 # wide to long format
 testset_pred_long  <- 
-testset_pred %>% 
+  testset_pred %>% 
   gather(axis, value, -vlogId) %>%
   arrange(vlogId,axis)
 head(testset_pred_long)
@@ -121,76 +123,3 @@ head(testset_pred_long)
 testset_pred_long %>%
   write_csv(path = "predictions.csv")
 
-dir()
-
-
-getwd()
-
-### CERA
-
-library(tidyverse) 
-install.packages("tidytext")
-library(tidytext)
-library(dplyr)
-
-# set the wd to R files
-getwd()
-setwd("/Users/ceraselasomersall/Documents/R files")
-file.choose()
-
-## TRANSCRIPT FILES
-# get the transcript files from wd (downloaded it) and read into R with dir()
-transcript_files <- dir("/Users/ceraselasomersall/Documents/R files/youtube-personality/transcripts", full.names = T)
-#first 6 transcript files
-head(transcript_files) 
-#rename the transcript files to easy name
-vlogId <- basename(transcript_files) 
-#replace every file with vlogId
-vlogId <- str_replace(vlogId, pattern = ".txt$", replacement = "") 
-# first 6 vlogID
-head(vlogId) 
-# put it into a tibble format for easy read
-transcripts_df <- tibble(vlogId=vlogId, Text = map_chr(transcript_files, ~ paste(readLines(.x), collapse = "\\n")), filename = transcript_files)
-transcripts_df %>% 
-  head() 
-
-View(transcripts_df)
-
-## OCEAN PERSONALITY
-file.choose()
-# read data personality impression scores train
-pers_impr <- read_delim("/Users/ceraselasomersall/Documents/R files/youtube-personality/YouTube-Personality-Personality_impression_scores_train.csv", " ")
-head(pers_impr) # first 6 scores on OCEAN personality test
-
-
-## GENDER
-# read data gender per vlogger
-gender <- read_delim("/Users/ceraselasomersall/Documents/R files/youtube-personality/YouTube-Personality-gender.csv", " ",) #why skip=2?
-names(gender) <- c('vlogId', 'gender')
-head(gender)
-
-## AUDIO VISUAL FEATURES
-# read audiovisual features data per vlogger
-audvis <- read_delim("/Users/ceraselasomersall/Documents/R files/youtube-personality/YouTube-Personality-audiovisual_features.csv", " ")
-
-# read data README text explaining the data
-README <- read_delim("/Users/ceraselasomersall/Documents/R files/youtube-personality/README.txt", " " )
-
-# add vlogger ID and gender and OCEAN in same table
-vlogger_df <- left_join(gender, pers_impr)
-head(vlogger_df) # what about vlogger 8? !is.na; those missing ones should be predicted
-
-testset_vloggers <- vlogger_df %>% filter(is.na(Extr)) # 80 vloggers to predict
-head(testset_vloggers)
-
-library(tidytext)
-# every word as one token per row, instead of lines
-transcripts_df %>% 
-  unnest_tokens(Word, Text) # capital T, 
-
-transcripts_testvlog <- semi_join(transcripts_df,testset_vloggers, by="vlogId")
-
-
-
-
->>>>>>> ee9193ed399fbe3b99287b6b99cb30906468d43e
