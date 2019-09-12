@@ -45,7 +45,7 @@ names(audiovisual)
 head(audiovisual)
 
 vlogger = left_join(gender, pers)
-vlogger_df = left_join(vlogger, audiovisual, by = "vlogId")
+vlogger = left_join(vlogger, audiovisual, by = "vlogId")
 head(vlogger_df) 
 
 # Test set: vlogs that has missing personality scores should be predicted 
@@ -53,6 +53,13 @@ testset_vloggers = vlogger_df %>%
   filter(is.na(Extr)) %>% 
   as_tibble()
 head(testset_vloggers)
+
+
+# Audiovisual data --------------------------------------------------------
+
+vlogger_train = as_tibble(vlogger) %>% 
+  drop_na() %>% 
+  mutate(gender = ifelse(gender == "Male", 0, 1))
 
 # Parsing the vlogs -------------------------------------------------------
 
@@ -68,20 +75,17 @@ train_transcripts_data = anti_join(transcripts_df2,testset_vloggers, by="vlogId"
   select(-filename)
 train_transcripts_data
 
-######################## Here we need to find a way to add the rest of teh vlogger_df data to these tibbles so we can run stuff
+######################## Here we need to find a way to add the rest of the vlogger_df data to these tibbles so we can run stuff
 
 
 ##### Calculate the most used words (90%) for every individual vlog, and 
 
-###### Create a new var which has the proportion of stop words used, and then remove the stop words to continue with the analysis
 
-
-
-# Trying stuff -------------------------------------------------------------------
+# Stop words -------------------------------------------------------------------
 
 train_transcripts_data %>% 
   group_by(vlogId) %>% 
-  count(Word, sort = T) %>%  ### What are the most common words per vlogId?
+  count(Word, sort = T)  ### What are the most common words per vlogId?
   
 train_data_parsed = train_transcripts_data %>% 
   anti_join(stop_words, by = c("Word" = "word")) ### Removing the stop_words
@@ -125,9 +129,77 @@ prop_stop = train_transcripts_prop %>% ## Create a tibble with only the words wh
   group_by(vlogId) %>% 
   mutate(prop_sw = sum(proportion_word_vlog))
 
-train_transcripts_prop_stop = train_transcripts_prop %>% ### Joining the tibble with and without the stop words
-  left_join(prop_stop) #### WHAT TO DO WITH THE NAs here? Here the NAs are words which are present but are not in the stop_words
-  
+prop_stop2 = prop_stop %>% 
+  select("vlogId", "prop_sw") %>% 
+  distinct()
+
+train_transcripts_prop2 = train_transcripts_prop %>% 
+  left_join(prop_stop2, by = "vlogId") %>% 
+  select(-"n")
+
+
+# Emotions and proportions ------------------------------------------------
+
+# 10 sentiments in nrc
+unique(get_sentiments("nrc")$sentiment) 
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy") 
+nrc_trust <- get_sentiments("nrc") %>% 
+  filter(sentiment == "trust") 
+nrc_fear <- get_sentiments("nrc") %>% 
+  filter(sentiment == "fear") 
+nrc_negative <- get_sentiments("nrc") %>% 
+  filter(sentiment == "negative") 
+nrc_sadness <- get_sentiments("nrc") %>% 
+  filter(sentiment == "sadness") 
+nrc_anger <- get_sentiments("nrc") %>% 
+  filter(sentiment == "anger") 
+nrc_surprise <- get_sentiments("nrc") %>% 
+  filter(sentiment == "surprise") 
+nrc_positive <- get_sentiments("nrc") %>% 
+  filter(sentiment == "positive") 
+nrc_disgust <- get_sentiments("nrc") %>% 
+  filter(sentiment == "disgust") 
+nrc_anticipation <- get_sentiments("nrc") %>% 
+  filter(sentiment == "anticipation") 
+
+
+nrc_sentiments = rbind(nrc_joy,nrc_trust,nrc_fear,nrc_negative,nrc_sadness,nrc_anger,nrc_surprise,nrc_positive,nrc_disgust,nrc_anticipation)
+
+
+names(train_data_parsed) <- c("vlogId","word")
+train_data_parsed1 = train_data_parsed %>%
+  select(vlogId,word) %>% 
+  group_by(vlogId) %>%
+  left_join(nrc_sentiments, by = "word") %>% 
+  drop_na() %>% 
+  count(sentiment, sort = T) %>%  # need to add columns 'proportion of certain sentiment'
+  mutate(ratio_emo = n/sum(n))
+
+train_data_parsed1
+
+train_data_parsed1$ratio_emo %>% replace_na(0)
+
+train_data_parsed2 = train_data_parsed1 %>% 
+  select(-n) %>% 
+  spread(sentiment, ratio_emo, fill = 0)
+
+
+# Binding it together -----------------------------------------------------
+
+### Audiovisual:   vlogger_train
+### Words:         train_transcripts_prop2
+### Sentiments:    train_data_parsed2
+
+final_data = vlogger_train %>% 
+  left_join(train_transcripts_prop2, train_data_parsed2, by = "vlogId")
+
+cor(final_data[, c(2:7)])
+
+lm.fit = lm(Extr ~ .-vlogId, final_data)
+summary(lm.fit)$coefficients
+
+
 ## --> Compute emotion indexes to create variables we can use for analysis
 
 # Work in progress: Parsing and prediction --------------------------------
