@@ -1,29 +1,18 @@
 # Competition1: Personality Profiling
 # attach packages
 library(tidyverse)
-library(tidytext)
-library(textdata)
-library(ggplot2)
-library(tidyr)
-library(readr)
-library(tibble)
-library(purrr)
-library(dplyr)
-library(stringr) 
-library(forcats)
 
+Sys.setenv('R_MAX_VSIZE'=32000000000)
 
 # Getting the data --------------------------------------------------------
 
 setwd("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality")
 
-list.files(path = "~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality")
-
 # source transcript text files
-transcript_files = dir("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/transcripts", full.names = TRUE)
+transcript_files = dir("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/transcripts", full.names = TRUE) 
 head(transcript_files)
 
-# encodevlogger ID
+# encodevlogger ID 
 vlogId = basename(transcript_files)
 vlogId = str_replace(vlogId, pattern = ".txt$", replacement = "") ### Error
 head(vlogId)
@@ -41,7 +30,7 @@ names(gender) = c('vlogId', 'gender')
 head(gender)
 
 audiovisual = read.delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-audiovisual_features.csv", sep=" ")
-names(audiovisual)
+names(audiovisual) 
 head(audiovisual)
 
 vlogger = left_join(gender, pers)
@@ -76,12 +65,6 @@ train_transcripts_data = anti_join(transcripts_df2,testset_vloggers, by="vlogId"
   select(-filename)
 train_transcripts_data
 
-######################## Here we need to find a way to add the rest of the vlogger_df data to these tibbles so we can run stuff
-
-
-##### Calculate the most used words (90%) for every individual vlog, and
-
-
 # Stop words -------------------------------------------------------------------
 
 train_transcripts_data %>%
@@ -113,14 +96,12 @@ train_data_parsed2 %>% ### Plot with 'I' and the most commonly used words
   geom_col() +
   coord_flip()
 
-#### Calculate the proportion of stop words which are used ####
-
+#### Calculate the proportion of stop words which are used and proportion of 'I' (per vlog) ####
 
 train_transcripts_prop = train_transcripts_data %>% ### This adds proportions for every single word
   count(vlogId, Word) %>%
   group_by(vlogId) %>%
   mutate(proportion_word_vlog = n / sum(n))
-
 
 prop_stop = train_transcripts_prop %>% ## Create a tibble with only the words which are stop_words, and add proportions to find the proportion of stop words within all of the words in the VLOG
   left_join(stop_words, by = c("Word" = "word")) %>%
@@ -130,53 +111,61 @@ prop_stop = train_transcripts_prop %>% ## Create a tibble with only the words wh
   group_by(vlogId) %>%
   mutate(prop_sw = sum(proportion_word_vlog))
 
+prop_stop_i = train_transcripts_prop %>%
+  group_by(vlogId) %>%
+  filter(Word == c("i", "I")) %>%
+  mutate(proportion_i = sum(proportion_word_vlog))
+
+prop_stop_you = train_transcripts_prop %>%
+  group_by(vlogId) %>%
+  filter(Word == "you") %>%
+  mutate(proportion_you = sum(proportion_word_vlog))
+
 prop_stop2 = prop_stop %>%
   select("vlogId", "prop_sw") %>%
   distinct()
 
+prop_stop_i2 = prop_stop_i %>% 
+  select("vlogId", "proportion_i") %>% 
+  distinct()
+
+prop_stop_you2 = prop_stop_you %>% 
+  select("vlogId", "proportion_you") %>% 
+  distinct()
+
 train_transcripts_prop2 = train_transcripts_prop %>%
-  left_join(prop_stop2, by = "vlogId") %>%
-  select(-"n")
+  select(-c("n", "proportion_word_vlog")) %>% 
+  left_join(prop_stop_i2, by = "vlogId") %>% 
+  mutate(proportion_i = replace_na(proportion_i, 0)) %>% 
+  left_join(prop_stop_you2, by = "vlogId") %>% 
+  mutate(proportion_you = replace_na(proportion_you, 0)) %>% 
+  left_join(prop_stop2, by = "vlogId")
 
 
 # Emotions and proportions ------------------------------------------------
 
-# 10 sentiments in nrc
-unique(get_sentiments("nrc")$sentiment)
-nrc_joy <- get_sentiments("nrc") %>%
-  filter(sentiment == "joy")
-nrc_trust <- get_sentiments("nrc") %>%
-  filter(sentiment == "trust")
-nrc_fear <- get_sentiments("nrc") %>%
-  filter(sentiment == "fear")
-nrc_negative <- get_sentiments("nrc") %>%
-  filter(sentiment == "negative")
-nrc_sadness <- get_sentiments("nrc") %>%
-  filter(sentiment == "sadness")
-nrc_anger <- get_sentiments("nrc") %>%
-  filter(sentiment == "anger")
-nrc_surprise <- get_sentiments("nrc") %>%
-  filter(sentiment == "surprise")
-nrc_positive <- get_sentiments("nrc") %>%
-  filter(sentiment == "positive")
-nrc_disgust <- get_sentiments("nrc") %>%
-  filter(sentiment == "disgust")
-nrc_anticipation <- get_sentiments("nrc") %>%
-  filter(sentiment == "anticipation")
+# nrc: 10 sentiments
+unique(get_sentiments("nrc")$sentiment) # 10 emotions
+nrc_sentiments = get_sentiments("nrc")
 
+# bing: neg/pos 
+bing_sentiments = get_sentiments("bing")
 
-nrc_sentiments = rbind(nrc_joy,nrc_trust,nrc_fear,nrc_negative,nrc_sadness,nrc_anger,nrc_surprise,nrc_positive,nrc_disgust,nrc_anticipation)
+library_join = nrc_sentiments %>%
+  full_join(bing_sentiments, by=c("word")) %>% 
+  mutate(sentiment.y = replace_na(sentiment.y, 0)) %>% #replace NA in column
+  mutate(sentiment.x = replace_na(sentiment.x, 0)) #replace NA in column
 
+names(library_join) <- c("word","sentiment","bing")
 
 names(train_data_parsed) <- c("vlogId","word")
 train_data_parsed1 = train_data_parsed %>%
   select(vlogId,word) %>%
   group_by(vlogId) %>%
-  left_join(nrc_sentiments, by = "word") %>%
+  left_join(library_join, by = "word") %>%
   drop_na() %>%
-  count(sentiment, sort = T) %>%  # need to add columns 'proportion of certain sentiment'
-  mutate(ratio_emo = n/sum(n))
-
+  count(sentiment, sort = T) %>%
+  mutate(ratio_emo = n/sum(n)) 
 train_data_parsed1
 
 train_data_parsed1$ratio_emo %>% replace_na(0)
@@ -184,7 +173,7 @@ train_data_parsed1$ratio_emo %>% replace_na(0)
 train_data_parsed2 = train_data_parsed1 %>%
   select(-n) %>%
   spread(sentiment, ratio_emo, fill = 0)
-
+train_data_parsed2
 
 
 # Doing it again, should change for final version -------------------------
@@ -221,41 +210,37 @@ test_prop_stop = test_transcripts_prop %>% ## Create a tibble with only the word
   group_by(vlogId) %>%
   mutate(prop_sw = sum(proportion_word_vlog))
 
+test_prop_stop_i = test_transcripts_prop %>%
+  group_by(vlogId) %>%
+  filter(Word == c("i", "I")) %>%
+  mutate(proportion_i = sum(proportion_word_vlog))
+
+test_prop_stop_you = test_transcripts_prop %>%
+  group_by(vlogId) %>%
+  filter(Word == "you") %>%
+  mutate(proportion_you = sum(proportion_word_vlog))
+
 test_prop_stop2 = test_prop_stop %>%
   select("vlogId", "prop_sw") %>%
   distinct()
 
-test_transcripts_prop2 = test_transcripts_prop %>%
-  left_join(test_prop_stop2, by = "vlogId") %>%
-  select(-"n")
+test_prop_stop_i2 = test_prop_stop_i %>% 
+  select("vlogId", "proportion_i") %>% 
+  distinct()
 
+test_prop_stop_you2 = test_prop_stop_you %>% 
+  select("vlogId", "proportion_you") %>% 
+  distinct()
+
+test_transcripts_prop2 = test_transcripts_prop %>%
+  select(-c("n", "proportion_word_vlog")) %>% 
+  left_join(test_prop_stop_i2, by = "vlogId") %>% 
+  mutate(test_proportion_i = replace_na(proportion_i, 0)) %>% 
+  left_join(test_prop_stop_you2, by = "vlogId") %>% 
+  mutate(proportion_you = replace_na(proportion_you, 0)) %>% 
+  left_join(test_prop_stop2, by = "vlogId")
 
 # Emotions and proportions ------------------------------------------------
-
-# 10 sentiments in nrc
-unique(get_sentiments("nrc")$sentiment)
-nrc_joy <- get_sentiments("nrc") %>%
-  filter(sentiment == "joy")
-nrc_trust <- get_sentiments("nrc") %>%
-  filter(sentiment == "trust")
-nrc_fear <- get_sentiments("nrc") %>%
-  filter(sentiment == "fear")
-nrc_negative <- get_sentiments("nrc") %>%
-  filter(sentiment == "negative")
-nrc_sadness <- get_sentiments("nrc") %>%
-  filter(sentiment == "sadness")
-nrc_anger <- get_sentiments("nrc") %>%
-  filter(sentiment == "anger")
-nrc_surprise <- get_sentiments("nrc") %>%
-  filter(sentiment == "surprise")
-nrc_positive <- get_sentiments("nrc") %>%
-  filter(sentiment == "positive")
-nrc_disgust <- get_sentiments("nrc") %>%
-  filter(sentiment == "disgust")
-nrc_anticipation <- get_sentiments("nrc") %>%
-  filter(sentiment == "anticipation")
-
-nrc_sentiments = rbind(nrc_joy,nrc_trust,nrc_fear,nrc_negative,nrc_sadness,nrc_anger,nrc_surprise,nrc_positive,nrc_disgust,nrc_anticipation)
 
 test_data_parsed1 = test_data_parsed %>%
   select(vlogId, Word) %>%
@@ -282,107 +267,45 @@ final_data = vlogger_train %>%
   left_join(train_transcripts_prop2, by = "vlogId") %>% 
   left_join(train_data_parsed2, by = "vlogId") ### Check why trust is NA in the lm
 
-
-
+final_data # final dataset training
+final_test # final dataset test
 
 cor(final_data[, c(2:7)])
 
-# lm.fit = lm(Extr ~ .-vlogId, final_data) ### Error in object[[i]] : object of type 'closure' is not subsettable
+
+# lm.fit = lm(Extr ~ .-vlogId, final_data) ### Error in object[[i]] : object of type 'closure' is not subsettable, ### too many variables included, crashed everytime running!!
 # summary(lm.fit)$coefficients
 
-lm_fit_extr = lm(Extr ~ gender + anger + anticipation + disgust + fear + joy + negative + positive + sadness + surprise + prop_sw, final_data)
-
-summary(lm_fit_extr)
 head(final_data)
+names(final_data) # 46 variables (incl. vlogId and 5 DV)
 
-lm_fit_agr = lm(Agr ~ gender + anger + anticipation + disgust + fear + joy + negative + positive + sadness + surprise + prop_sw, final_data)
-summary(lm_fit_agr)
+lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . -vlogId - Word - trust, data = final_data)# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
 
-lm_fit_cons = lm(Cons ~ gender + anger + anticipation + disgust + fear + joy + negative + positive + sadness + surprise + prop_sw, final_data)
-summary(lm_fit_cons)
-
-lm_fit_emot = lm(Emot ~ gender + anger + anticipation + disgust + fear + joy + negative + positive + sadness + surprise + prop_sw, final_data)
-summary(lm_fit_emot)
-
-lm_fit_open = lm(Open ~ gender + anger + anticipation + disgust + fear + joy + negative + positive + sadness + surprise + prop_sw, final_data)
-summary(lm_fit_open)
-
-
-## --> Compute emotion indexes to create variables we can use for analysis
-
-# Work in progress: Parsing and prediction --------------------------------
-summary(trust)
-
-
-
-# Predictions -------------------------------------------------------------
-
-
-## 1. transcripts - sentiment analysis
-transcripts_df
-transcripts_df[1,]
-
-get_sentiments("afinn") # words with values [-5,5]
-get_sentiments("bing") # negative/positive
-get_sentiments("nrc") # categories
-
-
-
-
-
-## 2. audiovisual clues - mlm
-vlogger_df
-names(vlogger_df)
-
-# fit_mlm <- lm(cbind(Extr, Agr, Cons, Emot, Open) ~ x1 + x2 + ..., data = vlogger_df)
-
-
-
-
-
-#################### Cera
-
-
-
+summary(lm_fit)
 
 
 # Output ------------------------------------------------------------------
 
-
-
 # predict on test set
-pred_mlm_extr = predict(lm_fit_extr, new = final_test)
-head(pred_mlm_extr)
+pred_mlm = predict(lm_fit, new=final_test)
+head(pred_mlm)
 
-pred_mlm_agr = predict(lm_fit_agr, new = final_test)
-head(pred_mlm_agr)
-
-pred_mlm_cons = predict(lm_fit_cons, new = final_test)
-head(pred_mlm_cons)
-
-pred_mlm_emot = predict(lm_fit_emot, new = final_test)
-head(pred_mlm_emot)
-
-pred_mlm_open = predict(lm_fit_open, new = final_test)
-head(pred_mlm_open)
-
-
-
-
-# remove old prediction from testset_features
-testset_vloggers = testset_vloggers %>% 
-  select(-Extr, -Agr, -Cons, -Emot, -Open)
 
 # compute output data frame
+final_test_DVremoved = final_test %>% 
+  select(-c(Extr:Open))
+
 testset_pred  <- 
-  cbind(testset_vloggers, pred_mlm) %>%
-  select(vlogId, Extr:Open)
+  cbind(final_test_DVremoved, pred_mlm) %>%
+  select(vlogId, Extr:Open) %>% 
+  unique()
 head(testset_pred)
+nrow(testset_pred) # 80 test data
 
 # wide to long format
 testset_pred_long  <- 
   testset_pred %>% 
-  gather(axis, value, -vlogId) %>%
+  gather(axis, Expected, -vlogId) %>%
   arrange(vlogId,axis)
 head(testset_pred_long)
 
