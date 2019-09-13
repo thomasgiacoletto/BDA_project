@@ -111,6 +111,25 @@ prop_stop = train_transcripts_prop %>% ## Create a tibble with only the words wh
   group_by(vlogId) %>%
   mutate(prop_sw = sum(proportion_word_vlog))
 
+prop_stop_ii = train_transcripts_prop %>% 
+  filter(Word == c("i", "I")) %>%
+  mutate(i = sum(n)) %>% 
+  select(-c("Word", "n", "proportion_word_vlog"))
+
+
+prop_stop_youi = train_transcripts_prop %>% 
+  filter(Word == "you") %>%
+  mutate(you = sum(n)) %>% 
+  select(-c("Word", "n", "proportion_word_vlog"))
+
+prop_stop_you_i = train_transcripts_prop %>%
+  left_join(prop_stop_ii, by = "vlogId") %>% 
+  mutate(i = replace_na(i, 0)) %>% 
+  left_join(prop_stop_youi, by = "vlogId") %>% 
+  mutate(you = replace_na(you, 0)) %>% 
+  mutate(you_i = i / (you + i)) %>% 
+  select(-c("i", "you"))
+
 prop_stop_i = train_transcripts_prop %>%
   group_by(vlogId) %>%
   filter(Word == c("i", "I")) %>%
@@ -134,12 +153,14 @@ prop_stop_you2 = prop_stop_you %>%
   distinct()
 
 train_transcripts_prop2 = train_transcripts_prop %>%
-  select(-c("n", "proportion_word_vlog")) %>% 
+  select(-c("n", "proportion_word_vlog", "Word")) %>% 
   left_join(prop_stop_i2, by = "vlogId") %>% 
   mutate(proportion_i = replace_na(proportion_i, 0)) %>% 
   left_join(prop_stop_you2, by = "vlogId") %>% 
   mutate(proportion_you = replace_na(proportion_you, 0)) %>% 
-  left_join(prop_stop2, by = "vlogId")
+  left_join(prop_stop2, by = "vlogId") # %>% 
+
+#  mutate(ratio_you_i = proportion_i / proportion_you)
 
 
 # Emotions and proportions ------------------------------------------------
@@ -209,6 +230,24 @@ test_prop_stop = test_transcripts_prop %>% ## Create a tibble with only the word
   distinct() %>%
   group_by(vlogId) %>%
   mutate(prop_sw = sum(proportion_word_vlog))
+
+test_prop_stop_ii = test_transcripts_prop %>% 
+  filter(Word == c("i", "I")) %>%
+  mutate(i = sum(n)) %>% 
+  select(-c("Word", "n", "proportion_word_vlog"))
+
+test_prop_stop_youi = test_transcripts_prop %>% 
+  filter(Word == "you") %>%
+  mutate(you = sum(n)) %>% 
+  select(-c("Word", "n", "proportion_word_vlog"))
+
+test_prop_stop_you_i = test_transcripts_prop %>%
+  left_join(test_prop_stop_ii, by = "vlogId") %>% 
+  mutate(i = replace_na(i, 0)) %>% 
+  left_join(test_prop_stop_youi, by = "vlogId") %>% 
+  mutate(you = replace_na(you, 0)) %>% 
+  mutate(you_i = i / (you + i)) %>% 
+  select(-c("i", "you"))
 
 test_prop_stop_i = test_transcripts_prop %>%
   group_by(vlogId) %>%
