@@ -1,6 +1,9 @@
 # Competition1: Personality Profiling
 # attach packages
 library(tidyverse)
+library(tidytext)
+# library(styler)
+# library(lintr)
 
 # Getting the data --------------------------------------------------------
 
@@ -170,22 +173,23 @@ final_data # final dataset training
 
 test_data = final_data %>% # Final test dataset
   filter(is.na(Extr))
+str(test_data)
 
-train_data = final_data # final train dataset
+train_data = final_data %>% # final train dataset
+  filter(!is.na(Extr))
 
+str(train_data)
 
 # Visualisation and modelling ---------------------------------------------
 
-cor(final_data[, c(2:7)])
+cor(train_data[, c(2:7)])
 
 
-# lm.fit = lm(Extr ~ .-vlogId, final_data) ### Error in object[[i]] : object of type 'closure' is not subsettable, ### too many variables included, crashed everytime running!!
-# summary(lm.fit)$coefficients
 
-head(final_data)
-names(final_data) # 46 variables (incl. vlogId and 5 DV)
+head(train_data)
+names(train_data) # 46 variables (incl. vlogId and 5 DV)
 
-lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . -vlogId - Word - trust, data = final_data)# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
+lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . - trust, train_data[,!colnames(train_data) %in% c("vlogId")])# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
 
 summary(lm_fit)
 
@@ -193,12 +197,16 @@ summary(lm_fit)
 # Output ------------------------------------------------------------------
 
 # predict on test set
-pred_mlm = predict(lm_fit, new=final_test)
+pred_mlm = predict(lm_fit, test_data, typw = "resp")
 head(pred_mlm)
+str(pred_mlm)
 
+pred_mlm = predict(lm_fit, test_data, allow.new.levels = T)
+head(pred_mlm)
+str(pred_mlm)
 
 # compute output data frame
-final_test_DVremoved = final_test %>% 
+final_test_DVremoved = test_data %>% 
   select(-c(Extr:Open))
 
 testset_pred  <- 
