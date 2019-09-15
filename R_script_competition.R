@@ -23,7 +23,6 @@ transcripts = tibble(vlogId = vlogId, Text = map_chr(transcript_files, ~ paste(r
 pers = read_delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-Personality_impression_scores_train.csv", " ")
 
 gender = read.delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-gender.csv", sep=" ")
-names(gender) = c('vlogId', 'gender') #### Why are we doing this, it is already the case?
 
 audiovisual = read.delim("~/Desktop/Behavioural Data Science/BDA/R Scripts/Competition/youtube-personality/YouTube-Personality-audiovisual_features.csv", sep=" ")
 
@@ -84,7 +83,9 @@ prop_stop = transcripts_prop %>% ## Create a tibble with only the words which ar
   filter(lexicon == 1) %>%
   distinct() %>%
   group_by(vlogId) %>%
-  mutate(prop_sw = sum(prop_word_vlog))
+  mutate(prop_sw = sum(prop_word_vlog)) %>%
+  select("vlogId", "prop_sw") %>%
+  distinct()
 
 prop_stop_i = transcripts_prop %>% 
   group_by(vlogId) %>% 
@@ -93,7 +94,7 @@ prop_stop_i = transcripts_prop %>%
   mutate(prop_i = sum(prop_word_vlog)) %>% 
   select(-c("Word", "n", "prop_word_vlog"))
 
-prop_stop_you = transcripts_prop %>% 
+  prop_stop_you = transcripts_prop %>% 
   group_by(vlogId) %>%
   filter(Word == "you") %>%
   mutate(sum_you = sum(n)) %>% 
@@ -109,21 +110,11 @@ prop_stop_you_i = transcripts_prop %>%
   select(-c("Word", "n", "prop_word_vlog")) %>% 
   distinct()
 
-prop_stop2 = prop_stop %>%
-  select("vlogId", "prop_sw") %>%
-  distinct()
-
-prop_stop_i2 = prop_stop_i %>% 
-  select("vlogId", "prop_i")
-
-prop_stop_you2 = prop_stop_you %>% 
-  select("vlogId", "prop_you")
-
 transcripts_final = transcripts_prop %>%
   select(-c("n", "prop_word_vlog", "Word")) %>% 
   left_join(prop_stop_you_i, by = "vlogId") %>% 
   mutate(prop_i = replace_na(prop_i, 0)) %>% 
-  left_join(prop_stop2, by = "vlogId") %>% 
+  left_join(prop_stop, by = "vlogId") %>% 
   distinct()
 
 
@@ -145,8 +136,21 @@ names(library_join) = c("word","sentiment","bing")
 
 names(transcript_data_parsed) = c("vlogId","word")
 
+# add: 'bing' variables: bing_positive, bing_negative, pos_to_neg
+bing_data = transcript_data_parsed %>%
+  group_by(vlogId) %>%
+  left_join(library_join, by = c("word")) %>%
+  drop_na() %>%
+  count(bing, sort = T) %>% 
+  filter(bing %in% c("negative","positive")) %>% 
+  mutate(prop_pos_or_neg = n/sum(n), prop_pos_or_neg = replace_na(prop_pos_or_neg, 0)) %>% 
+  select(-n) %>% 
+  spread(bing, prop_pos_or_neg, fill = 0) %>% 
+  mutate(pos_to_neg = positive/negative) %>% 
+  rename(bing_positive = positive, bing_negative = negative)
+
+# all emotion variables (nrc, bing) included 
 emotion_data_final = transcript_data_parsed %>%
-  ##  rename('Word' = 'word') %>%   ###############3 We should figure out how to do this one instead
   select(vlogId,word) %>%
   group_by(vlogId) %>%
   left_join(library_join, by = "word") %>%
@@ -154,17 +158,18 @@ emotion_data_final = transcript_data_parsed %>%
   count(sentiment, sort = T) %>%
   mutate(ratio_emo = n/sum(n), ratio_emo = replace_na(ratio_emo, 0)) %>% 
   select(-n) %>%
-  spread(sentiment, ratio_emo, fill = 0)
+  spread(sentiment, ratio_emo, fill = 0) %>% 
+  left_join(bing_data, by = "vlogId") %>% 
+  select(-`0`)
 
-transcripts_final
-emotion_data_final
-
+str(transcripts_final)
+str(emotion_data_final)
 
 # Binding it together -----------------------------------------------------
 
 final_data = vlogs %>%
   left_join(transcripts_final, by = "vlogId") %>% 
-  left_join(emotion_data_final, by = "vlogId") %>% ### Check why trust is NA in the lm
+  left_join(emotion_data_final, by = "vlogId") %>% 
   mutate(gender = ifelse(gender == "Male", 0, 1))
 
 final_data # final dataset training
@@ -197,7 +202,7 @@ summary(lm_fit)
 # Output ------------------------------------------------------------------
 
 # predict on test set
-pred_mlm = predict(lm_fit, test_data, typw = "resp")
+pred_mlm = predict(lm_fit, test_data, type = "resp")
 head(pred_mlm)
 str(pred_mlm)
 
