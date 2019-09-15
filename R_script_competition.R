@@ -2,6 +2,7 @@
 # attach packages
 library(tidyverse)
 library(tidytext)
+library(caret)
 # library(styler)
 # library(lintr)
 
@@ -136,7 +137,7 @@ names(library_join) = c("word","sentiment","bing")
 
 names(transcript_data_parsed) = c("vlogId","word")
 
-# add: 'bing' variables: bing_positive, bing_negative, pos_to_neg
+# add: 'bing' variables: prop_positive, prop_negative
 bing_data = transcript_data_parsed %>%
   group_by(vlogId) %>%
   left_join(library_join, by = c("word")) %>%
@@ -146,8 +147,22 @@ bing_data = transcript_data_parsed %>%
   mutate(prop_pos_or_neg = n/sum(n), prop_pos_or_neg = replace_na(prop_pos_or_neg, 0)) %>% 
   select(-n) %>% 
   spread(bing, prop_pos_or_neg, fill = 0) %>% 
-  mutate(pos_to_neg = positive/negative) %>% 
-  rename(bing_positive = positive, bing_negative = negative)
+  rename(prop_positive = positive, prop_negative = negative) 
+
+# add: 'bing' variables: num_pos, num_neg, nPos_to_nNeg
+bing_data_final = transcript_data_parsed %>%
+  group_by(vlogId) %>%
+  left_join(library_join, by = c("word")) %>%
+  drop_na() %>%
+  count(bing, sort = T) %>% 
+  filter(bing %in% c("negative","positive")) %>% 
+  mutate(num_pos_or_neg = n, num_pos_or_neg = replace_na(num_pos_or_neg, 0)) %>% 
+  select(-n) %>% 
+  spread(bing, num_pos_or_neg, fill = 0) %>% 
+  rename(num_pos = positive, num_neg = negative) %>% 
+  mutate(nPos_to_nPsNg = num_pos/(num_pos+num_neg), nPos_to_nPsNg = replace_na(nPos_to_nPsNg, 0)) %>% 
+  left_join(bing_data, by = c("vlogId"))
+
 
 # all emotion variables (nrc, bing) included 
 emotion_data_final = transcript_data_parsed %>%
@@ -159,7 +174,7 @@ emotion_data_final = transcript_data_parsed %>%
   mutate(ratio_emo = n/sum(n), ratio_emo = replace_na(ratio_emo, 0)) %>% 
   select(-n) %>%
   spread(sentiment, ratio_emo, fill = 0) %>% 
-  left_join(bing_data, by = "vlogId") %>% 
+  left_join(bing_data_final, by = "vlogId") %>% 
   select(-`0`)
 
 str(transcripts_final)
@@ -187,6 +202,18 @@ str(train_data)
 
 # Visualisation and modelling ---------------------------------------------
 
+# Visualising the data -----------------------------------------------------
+
+mfrow=c(2, 2)
+
+train_data %>%
+  filter()
+  ggplot(aes(Word, n)) +
+  geom_dotplot() +
+  coord_flip()
+
+
+
 cor(train_data[, c(2:7)])
 
 
@@ -194,7 +221,9 @@ cor(train_data[, c(2:7)])
 head(train_data)
 names(train_data) # 46 variables (incl. vlogId and 5 DV)
 
-lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . - trust, train_data[,!colnames(train_data) %in% c("vlogId")])# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
+all(is.na(train_data))
+
+lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . - trust, train_data[,!colnames(train_data) %in% c("vlogId")], na.action = na.exclude)# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
 
 summary(lm_fit)
 
