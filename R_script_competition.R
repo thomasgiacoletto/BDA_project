@@ -204,7 +204,7 @@ str(train_data)
 # Visualisation and modelling ---------------------------------------------
 
 # Visualising the data -----------------------------------------------------
-
+##################### MAYBE LOOK AT FREQUENCY SCATTERPLOT
 # Extr ~ prop_sw
 ggplot(train_data, aes(x=prop_sw, y=Extr, color = as.factor(gender))) +
   geom_point() +
@@ -235,7 +235,7 @@ ggplot(train_data, aes(x=nPos_to_nPsNg, y=Agr, color = as.factor(gender))) +
   geom_smooth(method=lm) +
   xlab("Proportion of Positive words among pos/neg") +
   ylab("Agreeableness") +
-  ggtitle("  Agreeable people used more positive words in their speech!")
+  ggtitle("Agreeable people used more positive words in their speech!")
 
 # Find correlations -------------------------------------------------------
 
@@ -243,9 +243,9 @@ cor_mat = train_data %>%
   select(-c("Extr", "Agr", "Cons", "Emot", "Open")) %>% 
   cor() %>% 
   findCorrelation(cutoff = .75) + 5 
-train_data2 = train_data[,-cor_mat] ## Removes the 8 variables which have are highly correlated (>75)
+train_data2 = train_data[,-cor_mat] ## Removes the 8 variables which have are highly correlated (>.75)
 
-# function model and summary for each trait
+# function model and summary for each trait --> Calculating the variables which are the most correlated with the dependant in the model, and 
 ModelSummary = function(trait){
   big5 = c("Extr", "Agr", "Cons", "Emot","Open")
   
@@ -262,7 +262,6 @@ ModelSummary = function(trait){
   lm_fit = lm(formula, train_data, na.action = na.exclude) 
   summary(lm_fit)
 }
-
 
 ModelSummary("Extr") # R-squared 0.2877 
 ModelSummary("Agr")  # R-squared 0.3216 
