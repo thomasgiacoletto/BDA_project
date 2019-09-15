@@ -196,7 +196,8 @@ test_data = final_data %>% # Final test dataset
 str(test_data)
 
 train_data = final_data %>% # final train dataset
-  filter(!is.na(Extr))
+  filter(!is.na(Extr)) %>% 
+  select(- vlogId)
 
 str(train_data)
 
@@ -204,48 +205,134 @@ str(train_data)
 
 # Visualising the data -----------------------------------------------------
 
-mfrow=c(2, 2)
+# Extr ~ prop_sw
+ggplot(train_data, aes(x=prop_sw, y=Extr, color = as.factor(gender))) +
+  geom_point() +
+  geom_smooth(method=lm) +
+  xlab("Proportion of Stop Words") +
+  ylab("Extraversion") +
+  ggtitle("  Extraverted people use less stop words!")
 
-train_data %>%
-  filter()
-  ggplot(aes(Word, n)) +
-  geom_dotplot() +
-  coord_flip()
+# Extr ~ sum_you
+ggplot(train_data, aes(x=anger, y=Open, color = as.factor(gender))) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  xlab("Number of 'you'words used") +
+  ylab("Extraversion") +
+  ggtitle("  Extraverted people use more 'you'! ")
+
+# Cons ~ time.speaking
+ggplot(train_data, aes(x=time.speaking, y=Cons, color = as.factor(gender))) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  xlab("time speaking") +
+  ylab("Conscientiousness") +
+  ggtitle("  Conscientious people speak longer in videos! ")
+
+# Agr ~ nPos_to_nPsNg
+ggplot(train_data, aes(x=nPos_to_nPsNg, y=Agr, color = as.factor(gender))) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  xlab("Proportion of Positive words among pos/neg") +
+  ylab("Agreeableness") +
+  ggtitle("  Agreeable people used more positive words in their speech!")
+
+# Find correlations -------------------------------------------------------
+
+cor_mat = train_data %>% 
+  select(-c("Extr", "Agr", "Cons", "Emot", "Open")) %>% 
+  cor() %>% 
+  findCorrelation(cutoff = .75) + 5 
+train_data2 = train_data[,-cor_mat] ## Removes the 8 variables which have are highly correlated (>75)
+
+# function model and summary for each trait
+ModelSummary = function(trait){
+  big5 = c("Extr", "Agr", "Cons", "Emot","Open")
+  
+    cor_mat_without_trait = train_data2 %>% 
+    select(-c(big5[! (trait == big5) ])) %>% 
+    cor()
+  
+  cor_mat2 = enframe(cor_mat_without_trait[, 2]) %>% 
+    filter(!name == trait) %>% 
+    filter(abs(value) >= .1) %>% 
+    pull(name)
+  
+  formula = as.formula(paste(trait, paste(cor_mat2, collapse = " + "), sep = " ~ "))
+  lm_fit = lm(formula, train_data, na.action = na.exclude) 
+  summary(lm_fit)
+}
 
 
+ModelSummary("Extr") # R-squared 0.2877 
+ModelSummary("Agr")  # R-squared 0.3216 
+ModelSummary("Open") # R-squared 0.1012  
+ModelSummary("Cons") # R-squared 0.1212  
+ModelSummary("Emot") # R-squared 0.1349
 
-cor(train_data[, c(2:7)])
+------------
 
 
+# Test --------------------------------------------------------------------
 
-head(train_data)
-names(train_data) # 46 variables (incl. vlogId and 5 DV)
-
-all(is.na(train_data))
-
-lm_fit = lm(cbind(Extr, Agr, Cons, Emot, Open) ~ . - trust, train_data[,!colnames(train_data) %in% c("vlogId")], na.action = na.exclude)# categorical variable 'Word' need to be removed, need to remove one of the nrc emotions (because they add up to 1)
-
-summary(lm_fit)
 
 
 # Output ------------------------------------------------------------------
 
+lm_fit_extr
+lm_fit_agr
+lm_fit_cons
+lm_fit_emot
+lm_fit_open
+
+predictions_Ids <- testset %>%
+  select(1) %>% 
+  cbind(Extr, Agr, Cons, Emot, Open) %>% 
+  gather(axis, value, -vlogId) %>%
+  arrange(vlogId,axis) %>% 
+  unite(Id, vlogId, axis)
+
+
+
 # predict on test set
-pred_mlm = predict(lm_fit, test_data, type = "resp")
+pred_mlm = predict(lm_fit_extr, test_data, type = "resp")
 head(pred_mlm)
 str(pred_mlm)
 
-pred_mlm = predict(lm_fit, test_data, allow.new.levels = T)
-head(pred_mlm)
-str(pred_mlm)
+Extr = predict(lm_fit_extr, test_data, type = "resp")
+Agr = predict(lm_fit_agr, test_data, type = "resp")
+Cons = predict(lm_fit_cons, test_data, type = "resp")
+Emot = predict(lm_fit_emot, test_data, type = "resp")
+Open = predict(lm_fit_open, test_data, type = "resp")
+
+
+# compute output data frame
+final_test_DVremoved = test_data %>% 
+  select(1) %>% 
+  cbind(extr, agr, cons, emot, open) %>% 
+  gather(axis, Expected, -vlogId) %>%
+  arrange(vlogId,axis) %>% 
+  unite(Id, vlogId, axis)
+
+head(final_test_DVremoved)
+
+final_test_DVremoved %>%
+  write_csv(path = "predictions.csv")
+
+
+
+predict_mlm = cbind(extr, agr, cons, emot, open)
+
+
+
 
 # compute output data frame
 final_test_DVremoved = test_data %>% 
   select(-c(Extr:Open))
 
 testset_pred  <- 
-  cbind(final_test_DVremoved, pred_mlm) %>%
-  select(vlogId, Extr:Open) %>% 
+  cbind(final_test_DVremoved, predict_mlm) %>%
+  select(vlogId, extr:open) %>% 
   unique()
 head(testset_pred)
 nrow(testset_pred) # 80 test data
@@ -253,8 +340,8 @@ nrow(testset_pred) # 80 test data
 # wide to long format
 testset_pred_long  <- 
   testset_pred %>% 
-  gather(axis, Expected, -vlogId) %>%
-  arrange(vlogId,axis)
+  gather(axis, Expected, - vlogId) %>%
+  arrange(vlogId, axis)
 head(testset_pred_long)
 
 # into submission format: column names 'VLOG8_cAGR' as Id
@@ -263,5 +350,18 @@ testset_pred_long <-
   unite(Id, vlogId, axis) 
 head(testset_pred_long)
 
-testset_pred_long %>%
+----------------------------------------------------------------#
+
+predictions =  test_data %>%
+  select(vlogId) %>% 
+  cbind(Extr, Agr, Cons, Emot, Open) %>% 
+  gather(axis, Expected, -vlogId) %>%
+  arrange(vlogId, axis) %>% 
+  unite(Id, vlogId, axis)
+
+predictions %>%
   write_csv(path = "predictions.csv")
+
+
+
+
